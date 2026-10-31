@@ -1,0 +1,19 @@
+# Gradle / Android
+.gradle/
+.kotlin/
+build/
+/local.properties
+/captures/
+*.apk
+*.aab
+.externalNativeBuild/
+.cxx/
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# 공모전 접수양식: 이름·연락처 등 개인정보가 들어가므로 저장소에 올리지 않음
+contest-application-consent.docx
+~$*.docx
