@@ -24,6 +24,38 @@
 
 SDK는 `https://nexus-playground.pleos.ai/repository/maven-releases/`에서 받습니다 (`settings.gradle.kts`에 등록됨).
 
+## 핵심 흐름
+
+"화장실 급해요" 버튼 → 현재 위치(FusedLocation, 미지원 시 내비 위치) → 가까운 화장실 5곳 추림 → 상위 3곳은 내비 `requestTrip`으로 실제 도착 예정 시간 조회 → 가장 빨리 닿는 곳 + 예비 1곳 선택 → 내비 경로에 추가 → 음성 안내
+
+경로에 넣는 방식:
+
+| 상황 | 동작 |
+|---|---|
+| 안내 중이 아님 | 화장실을 목적지로 설정 |
+| 안내 중, 경유지 없음 | 첫 번째 경유지로 추가 (원래 목적지 유지) |
+| 안내 중, 경유지 있음 | 화장실을 맨 앞에 두고 경로 재요청 (경유지는 최대 2개라 기존 두 번째 경유지는 빠짐) |
+
+```
+app/src/main/java/com/jamkkanstop/app/
+├── MainActivity.kt            화면 (주행 중 1~2초 안에 읽히는 큰 글자)
+├── data/                      화장실 DB, 개방시간 해석, 거리 계산
+├── urgent/                    후보 순위 결정(UrgentStopPlanner), 화면 상태(ViewModel)
+└── pleos/                     Pleos SDK 래퍼: 내비, 위치, 음성
+```
+
+## 화장실 데이터
+
+`app/src/main/assets/toilets.json`에 들어 있습니다. 지금은 데모용 **샘플 8곳**(이름에 "(샘플)" 표시, 좌표는 대략값)만 있습니다.
+
+실제 데이터로 바꾸려면 공공데이터포털(data.go.kr)에서 "공중화장실 정보" CSV를 받은 뒤:
+
+```bash
+python tools/convert_toilets.py 공중화장실정보.csv
+# 휴게소 데이터는 종류를 지정해서 함께 넣기
+python tools/convert_toilets.py 공중화장실정보.csv 휴게소.csv --type REST_AREA
+```
+
 ## 빌드
 
 ```bash
@@ -31,6 +63,10 @@ SDK는 `https://nexus-playground.pleos.ai/repository/maven-releases/`에서 받�
 ```
 
 APK는 `app/build/outputs/apk/debug/app-debug.apk`에 생성됩니다.
+
+```bash
+./gradlew testDebugUnitTest   # 순위 결정·개방시간 해석 단위 테스트
+```
 
 ## Pleos Connect Emulator 설정
 

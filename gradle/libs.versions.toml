@@ -4,6 +4,8 @@ kotlin = "2.0.0"
 coreKtx = "1.15.0"
 activityCompose = "1.9.1"
 composeBom = "2024.06.00"
+coroutines = "1.7.1"
+junit = "4.13.2"
 
 # Pleos Connect SDK (공모전 허용 SDK 5종)
 pleosVehicle = "2.3.2"
@@ -20,6 +22,8 @@ androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 pleos-vehicle = { group = "ai.pleos.playground", name = "Vehicle", version.ref = "pleosVehicle" }
 pleos-navihelper = { group = "ai.pleos.playground", name = "NaviHelper", version.ref = "pleosNaviHelper" }

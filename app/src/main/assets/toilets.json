@@ -1,0 +1,10 @@
+[
+  {"id":"sample-1","name":"서울만남의광장 휴게소(샘플)","address":"서울 서초구 양재대로","lat":37.4597,"lng":127.0421,"type":"REST_AREA","open":"24시간"},
+  {"id":"sample-2","name":"죽전 휴게소(샘플)","address":"경기 용인시 수지구","lat":37.3331,"lng":127.1081,"type":"REST_AREA","open":"24시간"},
+  {"id":"sample-3","name":"기흥 휴게소(샘플)","address":"경기 용인시 기흥구","lat":37.2486,"lng":127.1090,"type":"REST_AREA","open":"24시간"},
+  {"id":"sample-4","name":"서울역 공중화장실(샘플)","address":"서울 중구 한강대로","lat":37.5547,"lng":126.9707,"type":"PUBLIC","open":"05:00~24:00"},
+  {"id":"sample-5","name":"시청 공중화장실(샘플)","address":"서울 중구 세종대로","lat":37.5657,"lng":126.9769,"type":"PUBLIC","open":"09:00~22:00"},
+  {"id":"sample-6","name":"강남역 공중화장실(샘플)","address":"서울 강남구 강남대로","lat":37.4979,"lng":127.0276,"type":"PUBLIC","open":"24시간"},
+  {"id":"sample-7","name":"양재역 공중화장실(샘플)","address":"서울 서초구 남부순환로","lat":37.4842,"lng":127.0347,"type":"PUBLIC","open":""},
+  {"id":"sample-8","name":"판교역 공중화장실(샘플)","address":"경기 성남시 분당구","lat":37.3948,"lng":127.1112,"type":"PUBLIC","open":"06:00~23:00"}
+]
