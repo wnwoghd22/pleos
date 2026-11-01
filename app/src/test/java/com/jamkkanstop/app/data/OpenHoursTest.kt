@@ -30,6 +30,19 @@ class OpenHoursTest {
         assertEquals(Status.CLOSED, OpenHours.status("18:00~02:00", at(12)))
     }
 
+    @Test fun `실제 데이터에 많은 변형 표기`() {
+        assertEquals(Status.OPEN, OpenHours.status("00:00~00:00", at(3)))
+        assertEquals(Status.OPEN, OpenHours.status("09:00∼18:00", at(10)))
+        assertEquals(Status.CLOSED, OpenHours.status("09~18", at(20)))
+        assertEquals(Status.OPEN, OpenHours.status("(평일)09:00~18:00", at(10)))
+        assertEquals(Status.OPEN, OpenHours.status("05:00~01:00", at(0, 30)))
+    }
+
+    @Test fun `시간이 아닌 숫자 범위는 미확인`() {
+        assertEquals(Status.UNKNOWN, OpenHours.status("(평일)0900~1800", at(12)))
+        assertEquals(Status.UNKNOWN, OpenHours.status("하절기(7~9월)", at(12)))
+    }
+
     @Test fun `알 수 없는 형식은 미확인`() {
         assertEquals(Status.UNKNOWN, OpenHours.status(null, at(12)))
         assertEquals(Status.UNKNOWN, OpenHours.status("", at(12)))

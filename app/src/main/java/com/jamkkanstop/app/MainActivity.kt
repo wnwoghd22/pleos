@@ -34,7 +34,9 @@ import androidx.compose.ui.unit.sp
 import com.jamkkanstop.app.data.OpenHours
 import com.jamkkanstop.app.data.Toilet
 import com.jamkkanstop.app.data.ToiletType
+import com.jamkkanstop.app.pleos.ComfortMode
 import com.jamkkanstop.app.pleos.LocationSource
+import com.jamkkanstop.app.urgent.ComfortStatus
 import com.jamkkanstop.app.pleos.StopInsertMode
 import com.jamkkanstop.app.pleos.StopInsertResult
 import com.jamkkanstop.app.urgent.Announcements
@@ -65,6 +67,8 @@ class MainActivity : ComponentActivity() {
                         onUrgent = viewModel::onUrgent,
                         onSwitchToBackup = viewModel::onSwitchToBackup,
                         onDismiss = viewModel::onDismiss,
+                        onComfort = viewModel::onComfort,
+                        onComfortOff = viewModel::onComfortOff,
                     )
                 }
             }
@@ -80,6 +84,8 @@ fun UrgentScreen(
     onUrgent: () -> Unit,
     onSwitchToBackup: () -> Unit,
     onDismiss: () -> Unit,
+    onComfort: (ComfortMode) -> Unit = {},
+    onComfortOff: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier.fillMaxSize().padding(48.dp),
@@ -89,7 +95,11 @@ fun UrgentScreen(
         when (state) {
             UrgentUiState.Idle -> UrgentButton(onUrgent)
             UrgentUiState.Searching -> BigMessage("가까운 화장실 찾는 중…")
-            is UrgentUiState.Guiding -> GuidingPanel(state.plan, state.insert, onSwitchToBackup, onDismiss)
+            is UrgentUiState.Guiding -> {
+                GuidingPanel(state.plan, state.insert, onSwitchToBackup, onDismiss)
+                Spacer(Modifier.height(32.dp))
+                ComfortRow(state.comfort, onComfort, onComfortOff)
+            }
             is UrgentUiState.Failed -> {
                 BigMessage(state.message)
                 Spacer(Modifier.height(32.dp))
@@ -133,6 +143,33 @@ private fun GuidingPanel(
             LargeOutlinedButton("예비: ${backup.toilet.name} ${Announcements.minutes(backup.etaSeconds)}분", onSwitchToBackup)
         }
         LargeOutlinedButton("닫기", onDismiss)
+    }
+}
+
+/** 가는 동안 버티게 돕기. 고르기 전에는 두 모드 버튼, 켠 뒤에는 무엇을 바꿨는지와 끄기 버튼. */
+@Composable
+private fun ComfortRow(
+    status: ComfortStatus,
+    onComfort: (ComfortMode) -> Unit,
+    onComfortOff: () -> Unit,
+) {
+    when (status) {
+        ComfortStatus.Offer -> Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            LargeButton("배 아파요 · 따뜻하게") { onComfort(ComfortMode.WARM) }
+            LargeButton("식은땀 나요 · 시원하게") { onComfort(ComfortMode.COOL) }
+        }
+        is ComfortStatus.Applying -> Text("차 안을 맞추는 중…", fontSize = 26.sp, color = Color.LightGray)
+        is ComfortStatus.Active -> Row(
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                Announcements.comfortSummary(status.mode, status.changes) ?: "바꿀 수 있는 설정이 없어요",
+                fontSize = 26.sp,
+                color = Color(0xFF8FD3F4),
+            )
+            LargeOutlinedButton("원래대로", onComfortOff)
+        }
     }
 }
 

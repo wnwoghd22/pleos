@@ -17,3 +17,6 @@ build/
 # 공모전 접수양식: 이름·연락처 등 개인정보가 들어가므로 저장소에 올리지 않음
 contest-application-consent.docx
 ~$*.docx
+
+# 원본 공공데이터 CSV (크기가 커서 저장소에는 변환 결과 toilets.json만 둔다)
+/data/

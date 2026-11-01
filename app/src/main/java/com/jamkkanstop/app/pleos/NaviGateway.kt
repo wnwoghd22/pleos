@@ -165,8 +165,13 @@ class NaviGateway(context: Context) : EtaSource {
      */
     suspend fun insertStop(toilet: Toilet): StopInsertResult {
         // isRouting은 "경로 계산 중"이라 안내 중에도 false다 (에뮬레이터에서 확인). 안내 여부는 naviMode로 본다.
-        val guiding = routeState()?.naviMode in GUIDING_MODES
-        if (!guiding) {
+        val state = routeState()
+        if (state == null) {
+            // 내비가 응답하지 않는다 (앱이 아직 안 떴을 수 있음). 요청은 보내되 오래 붙잡지 않는다.
+            val ok = change(timeoutMs = 3_000) { navi.requestRoute(toilet.toRouteInfo()) }
+            return StopInsertResult(StopInsertMode.AS_DESTINATION, ok)
+        }
+        if (state.naviMode !in GUIDING_MODES) {
             val ok = change { navi.requestRoute(toilet.toRouteInfo()) }
             return StopInsertResult(StopInsertMode.AS_DESTINATION, ok)
         }
@@ -233,11 +238,11 @@ class NaviGateway(context: Context) : EtaSource {
     ) { navi.getDestinationInfo() }
 
     /** 경로 변경 요청을 보내고 완료/오류 콜백을 기다린다. 응답이 없으면 false. */
-    private suspend fun change(call: () -> Unit): Boolean = (ask<Boolean>(
+    // 에뮬레이터에서 경로 재탐색에 8~11초 걸렸다. 기본은 여유 있게 기다린다.
+    private suspend fun change(timeoutMs: Long = 20_000, call: () -> Unit): Boolean = (ask<Boolean>(
         set = { routeChangeReply = it },
         clear = { routeChangeReply = null },
-        // 에뮬레이터에서 경로 재탐색에 8~11초 걸렸다. 여유 있게 기다린다.
-        timeoutMs = 20_000,
+        timeoutMs = timeoutMs,
         call = call,
     ) ?: false).also { Log.d(TAG, "route change confirmed=$it") }
 

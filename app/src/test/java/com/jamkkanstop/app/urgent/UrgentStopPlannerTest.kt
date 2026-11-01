@@ -56,6 +56,26 @@ class UrgentStopPlannerTest {
         assertTrue(plan.best.etaSeconds in 100..300) // 1.1km × 1.3 ÷ 30km/h ≈ 170초
     }
 
+    @Test fun `거리 추정 후보는 내비가 잰 후보를 이기지 못한다`() = runBlocking {
+        // 가까운 3곳만 내비에 묻는다. 4번째는 추정치(짧게 나옴)라도 뒤로 간다.
+        val toilets = listOf(toilet("a", 0.001), toilet("b", 0.002), toilet("c", 0.003), toilet("d", 0.004))
+        val eta = EtaSource { 1200 } // 내비 기준 20분 (정체)
+        val plan = UrgentStopPlanner(ToiletRepository(toilets), eta).plan(hereLat, hereLng, noon)!!
+
+        assertTrue(!plan.best.etaEstimated)
+        assertTrue(plan.backup!!.toilet.id != "d")
+    }
+
+    @Test fun `내비가 한 번 응답하지 않으면 나머지 후보는 묻지 않는다`() = runBlocking {
+        var asked = 0
+        val eta = EtaSource { asked++; null }
+        val toilets = listOf(toilet("a", 0.001), toilet("b", 0.002), toilet("c", 0.003))
+        val plan = UrgentStopPlanner(ToiletRepository(toilets), eta).plan(hereLat, hereLng, noon)!!
+
+        assertEquals(1, asked)
+        assertTrue(plan.best.etaEstimated)
+    }
+
     @Test fun `20km 안에 없으면 null`() = runBlocking {
         val plan = UrgentStopPlanner(ToiletRepository(listOf(toilet("far", 0.5))), { null }).plan(hereLat, hereLng, noon)
         assertNull(plan)

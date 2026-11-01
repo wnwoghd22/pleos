@@ -41,20 +41,40 @@ app/src/main/java/com/jamkkanstop/app/
 ├── MainActivity.kt            화면 (주행 중 1~2초 안에 읽히는 큰 글자)
 ├── data/                      화장실 DB, 개방시간 해석, 거리 계산
 ├── urgent/                    후보 순위 결정(UrgentStopPlanner), 화면 상태(ViewModel)
-└── pleos/                     Pleos SDK 래퍼: 내비, 위치, 음성
+└── pleos/                     Pleos SDK 래퍼: 내비, 위치, 음성, 차량(시트·공조·조명)
 ```
 
 ## 화장실 데이터
 
-`app/src/main/assets/toilets.json`에 들어 있습니다. 지금은 데모용 **샘플 8곳**(이름에 "(샘플)" 표시, 좌표는 대략값)만 있습니다.
+`app/src/main/assets/toilets.json`에 전국 공중화장실 **23,308곳**이 들어 있습니다 (약 4MB, 앱 시작 때 미리 읽음).
 
-실제 데이터로 바꾸려면 공공데이터포털(data.go.kr)에서 "공중화장실 정보" CSV를 받은 뒤:
+만드는 방법:
+
+1. 좌표가 있는 [전국공중화장실표준데이터](https://www.data.go.kr/data/15012892/standard.do) CSV를 받아 `data/`에 둡니다.
+2. 좌표는 없지만 더 최신인 행정안전부 "공중화장실정보" CSV가 있으면 `--hours-from`으로 함께 넣습니다.
+   주소가 같은 곳은 그 파일의 개방시간으로 바꾸고, "미개방"인 곳은 뺍니다.
 
 ```bash
-python tools/convert_toilets.py 공중화장실정보.csv
-# 휴게소 데이터는 종류를 지정해서 함께 넣기
-python tools/convert_toilets.py 공중화장실정보.csv 휴게소.csv --type REST_AREA
+python tools/convert_toilets.py data/전국공중화장실표준데이터.csv --hours-from 공중화장실정보.csv
+# 휴게소·주유소 데이터는 종류를 지정해서 함께 넣기
+python tools/convert_toilets.py data/전국공중화장실표준데이터.csv 휴게소.csv --type REST_AREA
 ```
+
+- 좌표가 없는 행과 이동화장실(행사용 임시 화장실)은 제외됩니다.
+- 원본 CSV는 크기가 커서 저장소에 넣지 않습니다(`.gitignore`).
+
+## 가는 동안 버티게 돕기
+
+안내가 시작되면 두 가지 모드를 고를 수 있습니다. 차가 지원하는 기능만 바꾸고(`check*Capabilities`), "원래대로"·"닫기"를 누르면 되돌립니다.
+
+| 모드 | 하는 일 |
+|---|---|
+| 배 아파요 · 따뜻하게 | 운전석 시트 열선(중간 단계), 핸들 열선, 켜진 통풍은 끔 |
+| 식은땀 나요 · 시원하게 | 통풍 시트, 설정 온도 2℃ 낮춤, 바람 한 단계 세게·얼굴 쪽, 외기 유입 |
+| 공통 | 엠비언트 라이트를 차분한 하늘색·낮은 밝기로, 음성 호흡 안내 |
+
+공조 전원이 꺼져 있으면 켜고, 되돌릴 때 다시 끕니다.
+Pleos Connect 2.1.0 에뮬레이터는 차량 설정 요청을 받기만 하고 값은 바꾸지 않습니다. 시스템 공조 바에서 직접 켜도 마찬가지입니다. 그래서 실제 반영 여부는 실차나 Virtual Console에서 확인해야 합니다.
 
 ## 빌드
 
