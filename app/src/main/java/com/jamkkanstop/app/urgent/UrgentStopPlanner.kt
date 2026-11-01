@@ -5,6 +5,7 @@ import com.jamkkanstop.app.data.NearbyToilet
 import com.jamkkanstop.app.data.OpenHours
 import com.jamkkanstop.app.data.Toilet
 import com.jamkkanstop.app.data.ToiletRepository
+import com.jamkkanstop.app.data.ToiletType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.LocalTime
@@ -34,11 +35,18 @@ data class StopPlan(val best: StopCandidate, val backup: StopCandidate?)
 class UrgentStopPlanner(
     private val repository: ToiletRepository,
     private val etaSource: EtaSource,
-    private val etaQueryCount: Int = 3,
+    /** 내비에 실제 시간을 물어볼 후보 수. 내비 응답은 한 곳에 0.1~0.2초라 넉넉히 묻는다. */
+    private val etaQueryCount: Int = 7,
 ) {
     suspend fun plan(latitude: Double, longitude: Double, now: LocalTime): StopPlan? {
         val nearby = withContext(Dispatchers.Default) {
-            repository.nearest(latitude, longitude, now, limit = 5)
+            // 고속도로에서는 직선으로 가까운 곳이 대개 도로 옆 마을이라 출구로 나가야 한다.
+            // 그래서 가까운 휴게소·졸음쉼터 몇 곳은 항상 후보에 넣고, 실제 시간은 내비로 비교한다.
+            val general = repository.nearest(latitude, longitude, now, limit = GENERAL_CANDIDATES)
+            val restAreas = repository.nearest(
+                latitude, longitude, now, limit = REST_AREA_CANDIDATES, type = ToiletType.REST_AREA,
+            )
+            (general + restAreas).distinctBy { it.toilet.id }.sortedBy { it.straightMeters }
         }
         if (nearby.isEmpty()) return null
 
@@ -55,6 +63,9 @@ class UrgentStopPlanner(
     }
 
     companion object {
+        const val GENERAL_CANDIDATES = 5
+        const val REST_AREA_CANDIDATES = 2
+
         /** 1분 이내 차이면 같은 것으로 본다. */
         private const val SAME_ETA_SECONDS = 60
 

@@ -24,8 +24,10 @@ class ToiletRepository(private val toilets: List<Toilet>) {
         now: LocalTime,
         limit: Int = 5,
         maxDistanceMeters: Double = 20_000.0,
+        type: ToiletType? = null,
     ): List<NearbyToilet> =
         toilets.asSequence()
+            .filter { type == null || it.type == type }
             .map { t ->
                 NearbyToilet(
                     toilet = t,

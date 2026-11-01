@@ -193,7 +193,7 @@ private fun ComfortRow(
 private fun detailLine(c: StopCandidate): String = buildList {
     add(
         when (c.toilet.type) {
-            ToiletType.REST_AREA -> "휴게소"
+            ToiletType.REST_AREA -> if ("쉼터" in c.toilet.name) "졸음쉼터" else "휴게소"
             ToiletType.GAS_STATION -> "주유소"
             ToiletType.PUBLIC -> "공중화장실"
         },

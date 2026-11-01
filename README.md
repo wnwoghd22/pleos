@@ -46,22 +46,32 @@ app/src/main/java/com/jamkkanstop/app/
 
 ## 화장실 데이터
 
-`app/src/main/assets/toilets.json`에 전국 공중화장실 **23,308곳**이 들어 있습니다 (약 4MB, 앱 시작 때 미리 읽음).
+`app/src/main/assets/toilets.json`에 전국 화장실 **23,725곳**이 들어 있습니다 (약 4MB, 앱 시작 때 미리 읽음).
 
-만드는 방법:
+| 종류 | 수 | 출처 |
+|---|---|---|
+| 공중화장실 | 20,382 | [전국공중화장실표준데이터](https://www.data.go.kr/data/15012892/standard.do) (좌표 있음) |
+| 주유소·충전소 | 2,760 | 위 데이터에 개방화장실로 등록된 곳 (이름으로 분류) |
+| 고속도로 휴게소 | 203 | 한국도로공사 휴게소 위치정보 API ([data.ex.co.kr](https://data.ex.co.kr)) |
+| 졸음쉼터(화장실 있음) | 253 | [전국졸음쉼터표준데이터](https://www.data.go.kr/data/15028203/standard.do) |
+| 그 밖의 휴게소 | 127 | 공중화장실 데이터 중 이름에 "휴게소"가 든 곳 |
 
-1. 좌표가 있는 [전국공중화장실표준데이터](https://www.data.go.kr/data/15012892/standard.do) CSV를 받아 `data/`에 둡니다.
-2. 좌표는 없지만 더 최신인 행정안전부 "공중화장실정보" CSV가 있으면 `--hours-from`으로 함께 넣습니다.
-   주소가 같은 곳은 그 파일의 개방시간으로 바꾸고, "미개방"인 곳은 뺍니다.
+공중화장실은 행정안전부 "공중화장실정보"(좌표 없음, 더 최신)로 개방시간을 보강하고, "미개방"인 곳은 뺍니다.
+휴게소·졸음쉼터·주유소는 차를 세우기 쉬운 곳으로 보고, 도착 시간이 1분 안쪽으로 비슷하면 앞에 둡니다.
+고속도로에서는 직선으로 가까운 곳이 대개 도로 옆 마을이라 출구로 나가야 합니다. 그래서 가까운 휴게소·졸음쉼터 2곳은 항상 후보에 넣고, 실제 시간은 내비로 비교합니다.
+
+다시 만들기:
 
 ```bash
-python tools/convert_toilets.py data/전국공중화장실표준데이터.csv --hours-from 공중화장실정보.csv
-# 휴게소·주유소 데이터는 종류를 지정해서 함께 넣기
-python tools/convert_toilets.py data/전국공중화장실표준데이터.csv 휴게소.csv --type REST_AREA
+# 1. 공중화장실 표준데이터 CSV는 위 링크에서 받아 data/전국공중화장실표준데이터.csv로 둔다
+# 2. 고속도로 휴게소·졸음쉼터 받기 (휴게소 API는 공개 시험용 키 test 사용, --ex-key로 바꿀 수 있음)
+python tools/fetch_highway.py
+# 3. 합치기
+python tools/convert_toilets.py data/전국공중화장실표준데이터.csv     data/고속도로휴게소.csv@REST_AREA data/졸음쉼터.csv@REST_AREA     --hours-from data/공중화장실정보.csv
 ```
 
 - 좌표가 없는 행과 이동화장실(행사용 임시 화장실)은 제외됩니다.
-- 원본 CSV는 크기가 커서 저장소에 넣지 않습니다(`.gitignore`).
+- 원본 CSV는 크기가 커서 저장소에 넣지 않습니다(`data/`는 `.gitignore`).
 
 ## 음성 명령
 

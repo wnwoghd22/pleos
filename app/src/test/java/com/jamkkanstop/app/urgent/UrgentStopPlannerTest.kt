@@ -60,10 +60,21 @@ class UrgentStopPlannerTest {
         // 가까운 3곳만 내비에 묻는다. 4번째는 추정치(짧게 나옴)라도 뒤로 간다.
         val toilets = listOf(toilet("a", 0.001), toilet("b", 0.002), toilet("c", 0.003), toilet("d", 0.004))
         val eta = EtaSource { 1200 } // 내비 기준 20분 (정체)
-        val plan = UrgentStopPlanner(ToiletRepository(toilets), eta).plan(hereLat, hereLng, noon)!!
+        val plan = UrgentStopPlanner(ToiletRepository(toilets), eta, etaQueryCount = 3).plan(hereLat, hereLng, noon)!!
 
         assertTrue(!plan.best.etaEstimated)
         assertTrue(plan.backup!!.toilet.id != "d")
+    }
+
+    @Test fun `고속도로에서는 직선으로 먼 휴게소라도 후보에 넣고 실제 시간으로 고른다`() = runBlocking {
+        // 도로 옆 마을 화장실 6곳(직선 0.1~0.6km, 출구로 나가야 해서 실제 15분)과 8km 앞 휴게소(실제 6분)
+        val towns = (1..6).map { toilet("town$it", 0.001 * it) }
+        val restArea = toilet("rest", 0.07, ToiletType.REST_AREA)
+        val eta = EtaSource { if (it.id == "rest") 360 else 900 }
+        val plan = UrgentStopPlanner(ToiletRepository(towns + restArea), eta).plan(hereLat, hereLng, noon)!!
+
+        assertEquals("rest", plan.best.toilet.id)
+        assertTrue(!plan.best.etaEstimated)
     }
 
     @Test fun `내비가 한 번 응답하지 않으면 나머지 후보는 묻지 않는다`() = runBlocking {
