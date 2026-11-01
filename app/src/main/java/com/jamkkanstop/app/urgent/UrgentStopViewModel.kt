@@ -14,6 +14,7 @@ import com.jamkkanstop.app.pleos.NaviGateway
 import com.jamkkanstop.app.pleos.StopInsertMode
 import com.jamkkanstop.app.pleos.StopInsertResult
 import com.jamkkanstop.app.pleos.VoiceGuide
+import com.jamkkanstop.app.pleos.VoiceInput
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -47,12 +48,14 @@ sealed interface ComfortStatus {
  * "화장실 급해요" 흐름: 현재 위치 → 가장 빨리 닿는 화장실 → 내비 경로에 추가 → 음성 안내
  * → (고르면) 시트·공조·조명으로 가는 동안 버티게 돕기.
  */
-class UrgentStopViewModel(app: Application) : AndroidViewModel(app) {
+class UrgentStopViewModel(private val app: Application) : AndroidViewModel(app) {
 
     private val navi = NaviGateway(app)
     private val location = LocationSource(app, navi)
     private val voice = VoiceGuide(app)
+    private val ears = VoiceInput(app)
     private val comfort = ComfortController(app)
+    private var listenJob: Job? = null
     private var comfortJob: Job? = null
     // 전국 데이터(약 2만 3천 곳)는 읽는 데 시간이 걸린다. 버튼을 누르기 전에 미리 읽어둔다.
     private val planner = viewModelScope.async(Dispatchers.IO) {
@@ -61,6 +64,10 @@ class UrgentStopViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _state = MutableStateFlow<UrgentUiState>(UrgentUiState.Idle)
     val state: StateFlow<UrgentUiState> = _state.asStateFlow()
+
+    /** 음성 명령을 듣는 중인지. 화면에 마이크 표시를 띄운다. */
+    private val _listening = MutableStateFlow(false)
+    val listening: StateFlow<Boolean> = _listening.asStateFlow()
 
     private var job: Job? = null
 
@@ -74,11 +81,14 @@ class UrgentStopViewModel(app: Application) : AndroidViewModel(app) {
         navi.connect()
         location.connect()
         voice.connect()
+        ears.connect()
         comfort.connect()
     }
 
     fun onUrgent() {
         if (job?.isActive == true) return
+        // 버튼을 누른 지금(화면이 보일 때) 시작해야 한다. 경로를 넣으면 내비가 화면을 가져가 앱이 백그라운드로 간다.
+        GuidingSessionService.start(app, "화장실 찾는 중")
         job = viewModelScope.launch(crashGuard) {
             _state.value = UrgentUiState.Searching
 
@@ -96,12 +106,14 @@ class UrgentStopViewModel(app: Application) : AndroidViewModel(app) {
 
             val insert = navi.insertStop(plan.best.toilet)
             _state.value = UrgentUiState.Guiding(plan, insert)
-            voice.say(Announcements.guiding(plan, insert))
+            GuidingSessionService.start(app, "${plan.best.toilet.name}(으)로 안내 중")
+            sayThenListen(Announcements.guiding(plan, insert))
         }
     }
 
     /** 예비 후보로 바꾼다. 바꾼 뒤에는 원래 1순위가 예비가 된다. */
     fun onSwitchToBackup() {
+        stopListening()
         val current = _state.value as? UrgentUiState.Guiding ?: return
         val backup = current.plan.backup ?: return
         if (job?.isActive == true) return
@@ -111,13 +123,16 @@ class UrgentStopViewModel(app: Application) : AndroidViewModel(app) {
             // 버티게 돕기 상태는 그대로 이어간다.
             val comfortNow = (_state.value as? UrgentUiState.Guiding)?.comfort ?: current.comfort
             _state.value = UrgentUiState.Guiding(plan, insert, comfortNow)
-            voice.say(Announcements.guiding(plan, insert, askComfort = comfortNow == ComfortStatus.Offer))
+            val askComfort = comfortNow == ComfortStatus.Offer
+            val text = Announcements.guiding(plan, insert, askComfort)
+            if (askComfort) sayThenListen(text) else voice.say(text)
         }
     }
 
     /** 복통 모드(따뜻하게) / 식은땀 모드(시원하게). */
     fun onComfort(mode: ComfortMode) {
         if (_state.value !is UrgentUiState.Guiding) return
+        stopListening()
         comfortJob?.cancel()
         comfortJob = viewModelScope.launch(crashGuard) {
             updateComfort(ComfortStatus.Applying(mode))
@@ -129,16 +144,59 @@ class UrgentStopViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun onComfortOff() {
+        stopListening()
         comfortJob?.cancel()
         comfort.restore()
         updateComfort(ComfortStatus.Offer)
     }
 
     fun onDismiss() {
+        stopListening()
+        voice.stop()
         job?.cancel()
         comfortJob?.cancel()
         comfort.restore()
         _state.value = UrgentUiState.Idle
+        GuidingSessionService.stop(app)
+    }
+
+    /**
+     * 안내를 끝까지 말한 뒤 한 번 듣고, 알아들은 명령을 실행한다.
+     * 운전 중에 화면을 누르지 않아도 되게 하는 것이 목적이다. 못 알아들으면 조용히 넘어간다 (재촉하지 않음).
+     */
+    private fun sayThenListen(text: String) {
+        stopListening()
+        listenJob = viewModelScope.launch(crashGuard) {
+            voice.sayAndWait(text)
+            _listening.value = true
+            val heard = try {
+                ears.listenOnce()
+            } finally {
+                _listening.value = false
+            }
+            listenJob = null // 아래 명령 처리에서 stopListening()이 자기 자신을 취소하지 않도록
+            handle(VoiceCommand.parse(heard), heard)
+        }
+    }
+
+    private fun handle(command: VoiceCommand?, heard: String?) {
+        Log.d(TAG, "voice command: \"$heard\" → $command")
+        if (_state.value !is UrgentUiState.Guiding) return
+        when (command) {
+            is VoiceCommand.Comfort -> onComfort(command.mode)
+            VoiceCommand.Backup -> onSwitchToBackup()
+            VoiceCommand.ComfortOff -> onComfortOff()
+            VoiceCommand.Dismiss -> onDismiss()
+            VoiceCommand.Nothing -> voice.say("알겠어요. 천천히 가세요.")
+            null -> Unit
+        }
+    }
+
+    private fun stopListening() {
+        listenJob?.cancel()
+        listenJob = null
+        if (_listening.value) ears.stop()
+        _listening.value = false
     }
 
     private fun updateComfort(status: ComfortStatus) {
@@ -149,10 +207,13 @@ class UrgentStopViewModel(app: Application) : AndroidViewModel(app) {
     private fun fail(message: String) {
         _state.value = UrgentUiState.Failed(message)
         voice.say(message)
+        GuidingSessionService.stop(app)
     }
 
     override fun onCleared() {
+        GuidingSessionService.stop(app)
         comfort.release() // 바꾼 시트·공조·조명을 되돌리고 연결 해제
+        ears.release()
         voice.release()
         location.release()
         navi.release()
@@ -177,7 +238,7 @@ object Announcements {
             insert.mode == StopInsertMode.REBUILT_ROUTE_DROPPED_SECOND -> "경유지로 넣었고, 두 번째 경유지는 뺐어요."
             else -> "원래 목적지는 그대로 두고 경유지로 넣었어요."
         }
-        val ask = if (askComfort) " 배가 아프면 따뜻하게, 식은땀이 나면 시원하게를 눌러 주세요." else ""
+        val ask = if (askComfort) " 배가 아프면 배 아파, 식은땀이 나면 식은땀이라고 말해 주세요." else ""
         return "$head $route 서두르지 않아도 괜찮아요.$ask"
     }
 

@@ -60,10 +60,12 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val state by viewModel.state.collectAsState()
+            val listening by viewModel.listening.collectAsState()
             MaterialTheme(colorScheme = darkColorScheme()) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     UrgentScreen(
                         state = state,
+                        listening = listening,
                         onUrgent = viewModel::onUrgent,
                         onSwitchToBackup = viewModel::onSwitchToBackup,
                         onDismiss = viewModel::onDismiss,
@@ -81,6 +83,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun UrgentScreen(
     state: UrgentUiState,
+    listening: Boolean = false,
     onUrgent: () -> Unit,
     onSwitchToBackup: () -> Unit,
     onDismiss: () -> Unit,
@@ -99,6 +102,10 @@ fun UrgentScreen(
                 GuidingPanel(state.plan, state.insert, onSwitchToBackup, onDismiss)
                 Spacer(Modifier.height(32.dp))
                 ComfortRow(state.comfort, onComfort, onComfortOff)
+                if (listening) {
+                    Spacer(Modifier.height(20.dp))
+                    ListeningHint()
+                }
             }
             is UrgentUiState.Failed -> {
                 BigMessage(state.message)
@@ -144,6 +151,16 @@ private fun GuidingPanel(
         }
         LargeOutlinedButton("닫기", onDismiss)
     }
+}
+
+/** 음성 명령을 듣는 중. 깜빡이지 않는 정적 표시 (안전 원칙). */
+@Composable
+private fun ListeningHint() {
+    Text(
+        "듣고 있어요 · \"배 아파\" \"식은땀\" \"다른 데\"",
+        fontSize = 26.sp,
+        color = Color(0xFFFFD27A),
+    )
 }
 
 /** 가는 동안 버티게 돕기. 고르기 전에는 두 모드 버튼, 켠 뒤에는 무엇을 바꿨는지와 끄기 버튼. */
@@ -245,6 +262,6 @@ private fun GuidingPreview() {
 @Composable
 private fun IdlePreview() {
     MaterialTheme(colorScheme = darkColorScheme()) {
-        Surface { UrgentScreen(UrgentUiState.Idle, {}, {}, {}) }
+        Surface { UrgentScreen(UrgentUiState.Idle, onUrgent = {}, onSwitchToBackup = {}, onDismiss = {}) }
     }
 }
