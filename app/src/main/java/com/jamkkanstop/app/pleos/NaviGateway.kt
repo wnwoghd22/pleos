@@ -21,7 +21,12 @@ import ai.pleos.playground.navi.helper.listener.NaviHelperEventListener
 import com.jamkkanstop.app.data.Geo
 import com.jamkkanstop.app.data.Toilet
 import com.jamkkanstop.app.urgent.EtaSource
+import ai.pleos.playground.navi.data.DestinationArrivedInfo
+import ai.pleos.playground.navi.data.WaypointArrivedInfo
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
@@ -57,6 +62,11 @@ class NaviGateway(context: Context) : EtaSource {
     @Volatile private var destinationReply: CompletableDeferred<DestinationInfo>? = null
     @Volatile private var locationReply: CompletableDeferred<CurrentLocationInfo>? = null
     @Volatile private var routeChangeReply: CompletableDeferred<Boolean>? = null
+
+    private val _arrivals = MutableSharedFlow<String>(extraBufferCapacity = 4)
+
+    /** 내비가 목적지·경유지 도착을 알린 장소 이름. 내비 앱 구현에 따라 오지 않을 수도 있다. */
+    val arrivals: SharedFlow<String> = _arrivals.asSharedFlow()
 
     private val listener = object : NaviHelperEventListener {
         override fun onTripInfo(tripInfo: TripInfo) {
@@ -97,6 +107,16 @@ class NaviGateway(context: Context) : EtaSource {
         override fun onWaypointChanged(waypointChangedInfo: WaypointChangedInfo) {
             Log.d(TAG, "onWaypointChanged $waypointChangedInfo")
             routeChangeReply?.complete(true)
+        }
+
+        override fun onDestinationArrived(destinationArrivedInfo: DestinationArrivedInfo) {
+            Log.d(TAG, "onDestinationArrived $destinationArrivedInfo")
+            _arrivals.tryEmit(destinationArrivedInfo.name)
+        }
+
+        override fun onWayPointArrived(waypointArrivedInfo: WaypointArrivedInfo) {
+            Log.d(TAG, "onWayPointArrived $waypointArrivedInfo")
+            _arrivals.tryEmit(waypointArrivedInfo.name)
         }
 
         override fun onError(errorCode: NaviErrorCode) {

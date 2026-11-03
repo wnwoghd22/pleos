@@ -19,6 +19,12 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,6 +40,8 @@ sealed interface UrgentUiState {
         val comfort: ComfortStatus = ComfortStatus.Offer,
     ) : UrgentUiState
     data class Failed(val message: String) : UrgentUiState
+    /** 화장실에 도착. [resumesOriginal]이면 내비가 원래 목적지로 이어서 안내한다. */
+    data class Arrived(val placeName: String, val resumesOriginal: Boolean) : UrgentUiState
 }
 
 /** 가는 동안 버티게 돕기(시트·공조·조명) 상태. */
@@ -56,6 +64,7 @@ class UrgentStopViewModel(private val app: Application) : AndroidViewModel(app) 
     private val ears = VoiceInput(app)
     private val comfort = ComfortController(app)
     private var listenJob: Job? = null
+    private var arrivalJob: Job? = null
     private var comfortJob: Job? = null
     // 전국 데이터(약 2만 3천 곳)는 읽는 데 시간이 걸린다. 버튼을 누르기 전에 미리 읽어둔다.
     private val planner = viewModelScope.async(Dispatchers.IO) {
@@ -107,6 +116,7 @@ class UrgentStopViewModel(private val app: Application) : AndroidViewModel(app) 
             val insert = navi.insertStop(plan.best.toilet)
             _state.value = UrgentUiState.Guiding(plan, insert)
             GuidingSessionService.start(app, "${plan.best.toilet.name}(으)로 안내 중")
+            watchArrival(plan.best, insert)
             sayThenListen(Announcements.guiding(plan, insert))
         }
     }
@@ -123,6 +133,7 @@ class UrgentStopViewModel(private val app: Application) : AndroidViewModel(app) 
             // 버티게 돕기 상태는 그대로 이어간다.
             val comfortNow = (_state.value as? UrgentUiState.Guiding)?.comfort ?: current.comfort
             _state.value = UrgentUiState.Guiding(plan, insert, comfortNow)
+            watchArrival(plan.best, insert)
             val askComfort = comfortNow == ComfortStatus.Offer
             val text = Announcements.guiding(plan, insert, askComfort)
             if (askComfort) sayThenListen(text) else voice.say(text)
@@ -151,6 +162,7 @@ class UrgentStopViewModel(private val app: Application) : AndroidViewModel(app) 
     }
 
     fun onDismiss() {
+        arrivalJob?.cancel()
         stopListening()
         voice.stop()
         job?.cancel()
@@ -199,6 +211,37 @@ class UrgentStopViewModel(private val app: Application) : AndroidViewModel(app) 
         _listening.value = false
     }
 
+    /**
+     * 도착을 지켜본다. 내비 도착 이벤트(이름이 같을 때)와 위치(화장실 100m 안) 중 먼저 오는 것을 쓴다.
+     * 도착하면 바꾼 시트·공조·조명을 되돌리고, 앱을 붙잡아 두던 서비스를 끝낸다.
+     */
+    private fun watchArrival(target: StopCandidate, insert: StopInsertResult) {
+        arrivalJob?.cancel()
+        arrivalJob = viewModelScope.launch(crashGuard) {
+            val byNavi = navi.arrivals.filter { Arrival.isSamePlace(it, target.toilet) }
+            val byLocation = flow {
+                while (true) {
+                    delay(LOCATION_CHECK_MS)
+                    location.current()?.let { emit(it) }
+                }
+            }.filter { Arrival.isNear(it.latitude, it.longitude, target.toilet, target.straightMeters) }
+            merge(byNavi.map { "navi" }, byLocation.map { "location" }).first().also {
+                Log.d(TAG, "arrived at ${target.toilet.name} (by $it)")
+            }
+            onArrived(target, insert)
+        }
+    }
+
+    private fun onArrived(target: StopCandidate, insert: StopInsertResult) {
+        stopListening()
+        comfortJob?.cancel()
+        comfort.restore()
+        val resumes = insert.confirmed && insert.mode != StopInsertMode.AS_DESTINATION
+        _state.value = UrgentUiState.Arrived(target.toilet.name, resumes)
+        voice.say(Announcements.arrived(resumes))
+        GuidingSessionService.stop(app)
+    }
+
     private fun updateComfort(status: ComfortStatus) {
         val s = _state.value as? UrgentUiState.Guiding ?: return
         _state.value = s.copy(comfort = status)
@@ -221,6 +264,7 @@ class UrgentStopViewModel(private val app: Application) : AndroidViewModel(app) 
 
     private companion object {
         const val TAG = "UrgentStop"
+        const val LOCATION_CHECK_MS = 10_000L
     }
 }
 
@@ -241,6 +285,10 @@ object Announcements {
         val ask = if (askComfort) " 배가 아프면 배 아파, 식은땀이 나면 식은땀이라고 말해 주세요." else ""
         return "$head $route 서두르지 않아도 괜찮아요.$ask"
     }
+
+    fun arrived(resumesOriginal: Boolean): String =
+        if (resumesOriginal) "도착했어요. 천천히 다녀오세요. 출발하면 원래 목적지로 이어서 안내해요."
+        else "도착했어요. 천천히 다녀오세요."
 
     /** 버티게 돕기를 켠 뒤. 무엇을 바꿨는지 짧게 말하고, 호흡 안내로 마무리한다. */
     fun comfort(mode: ComfortMode, changes: Set<ComfortChange>, minutesLeft: Int?): String {

@@ -115,6 +115,19 @@ fun UrgentScreen(
                     LargeOutlinedButton("닫기", onDismiss)
                 }
             }
+            is UrgentUiState.Arrived -> {
+                Text("도착했어요", fontSize = 96.sp, fontWeight = FontWeight.Bold)
+                Text(state.placeName, fontSize = 36.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    if (state.resumesOriginal) "출발하면 원래 목적지로 이어서 안내해요 · 시트·공조는 원래대로"
+                    else "시트·공조는 원래대로 돌려놨어요",
+                    fontSize = 24.sp,
+                    color = Color.LightGray,
+                )
+                Spacer(Modifier.height(40.dp))
+                LargeOutlinedButton("닫기", onDismiss)
+            }
         }
     }
 }
