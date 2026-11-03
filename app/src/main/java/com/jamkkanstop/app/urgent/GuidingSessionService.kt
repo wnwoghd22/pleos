@@ -57,7 +57,7 @@ class GuidingSessionService : Service() {
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_map)
             .setContentTitle(title)
-            .setContentText("눌러서 잠깐스톱 열기")
+            .setContentText("눌러서 뿌지직 열기")
             .setContentIntent(open)
             .setOngoing(true)
             .build()

@@ -16,5 +16,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "jamkkanstop"
+rootProject.name = "pzzk"
 include(":app")

@@ -1,13 +1,49 @@
-# 잠깐스톱 (가제)
+# 뿌지직 (pzzk)
 
-급한 변의가 왔을 때 가장 가까운 화장실을 내비 경유지로 넣어주고, 가는 동안 차량 기능(시트·공조·조명·음성)으로 운전자를 돕는 Pleos Connect 앱입니다.
-2026 Pleos Playground 차량용 앱 개발 공모전 출품작입니다. 기획 내용은 [description.md](description.md)에 있습니다.
+**똥줄 탈 때, 차가 사람을 위해 할 수 있는 모든 것.**
+
+급한 변의가 왔을 때 가장 빨리 닿는 화장실을 내비 경유지로 넣고, 가는 동안 차량 기능(시트·공조·조명·음성)으로 운전자가 버티도록 돕는 Pleos Connect 앱입니다.
+2026 현대자동차그룹 차량용 앱 개발 공모전 출품작입니다. 기획 내용은 [description.md](description.md)에 있습니다.
+
+## APK
+
+- 위치: [`apk/`](apk/) 폴더의 `*_뿌지직_release.apk` (서명된 release 빌드)
+- 패키지 이름: `com.jamkkanstop.app` (개발 중 가제를 쓰던 때의 이름을 그대로 둠)
+
+## 실행 방법
+
+1. Pleos Connect v2.1.0 에뮬레이터를 켭니다 (설정은 아래 [Pleos Connect Emulator 설정](#pleos-connect-emulator-설정)).
+2. **내비 앱을 먼저 실행하고 1~2분 기다립니다.** 부팅 직후에는 내비가 앱의 요청에 답하지 않아, 도착 시간을 거리로만 추정하고 경로도 넣지 못합니다.
+   ```bash
+   adb shell monkey -p ai.umos.maps.android.navigation.app -c android.intent.category.LAUNCHER 1
+   ```
+3. APK를 설치하고 앱 목록에서 **뿌지직**을 엽니다.
+   ```bash
+   adb install apk/<파일명>.apk
+   ```
+4. 처음 열 때 위치 권한(화면에는 "알 수 없는 작업"으로 표시됨)을 **허용**합니다.
+5. **화장실 급해요** 버튼을 누릅니다. 가장 빨리 닿는 화장실과 예비 후보가 나오고, 내비 경로에 들어간 뒤 음성으로 안내합니다.
+6. 안내가 끝나면 앱이 8초 동안 듣습니다. "배 아파"(따뜻하게), "식은땀"(시원하게), "다른 데"(예비 후보로) 같은 말에 반응합니다.
+
+## 테스트 환경과 필요한 설정
+
+| 항목 | 내용 |
+|---|---|
+| 에뮬레이터 | Pleos Connect v2.1.0 (Android 14, API 34, x86_64), RAM 4GB, Cold boot |
+| 위치 바꾸기 | `adb emu geo fix <경도> <위도>` (예: 판교 `adb emu geo fix 127.1046 37.3948`) |
+| 도착 확인 | 안내 중 위치를 화장실 좌표로 옮기면 10초 안에 "도착했어요" 화면과 음성이 나옵니다 |
+| 음성 입력 | Extended controls → Microphone → "Virtual microphone uses host audio input"을 켜고 PC 마이크로 말합니다 |
+
+에뮬레이터에서 확인할 수 없는 것:
+
+- **차량 값 변경.** 시트 열선·통풍, 공조, 조명 요청은 받지만 값이 바뀌지 않습니다(시스템 공조 바로 직접 바꿔도 마찬가지). 실차나 Virtual Console에서 확인해야 합니다.
+- **내비 현재 위치.** 내비 앱이 에뮬레이터 GPS를 받지 않아 성남 수정구 시흥동에 머뭅니다. 그래서 내비가 계산하는 도착 시간은 그 위치를 기준으로 합니다. 앱의 후보 선정은 `geo fix` 위치를 따릅니다.
 
 ## 개발 환경
 
 | 항목 | 버전 |
 |---|---|
-| Android Studio | 최신 버전 (내장 JDK 17 사용) |
+| JDK | 21 (Gradle 8.11.1은 Java 25에서 실행되지 않음) |
 | Gradle / AGP | 8.11.1 / 8.9.2 |
 | Kotlin / Compose | 2.0.0 / BOM 2024.06.00 |
 | minSdk / targetSdk / compileSdk | 28 / 34 / 35 |
@@ -26,7 +62,7 @@ SDK는 `https://nexus-playground.pleos.ai/repository/maven-releases/`에서 받�
 
 ## 핵심 흐름
 
-"화장실 급해요" 버튼 → 현재 위치(FusedLocation, 미지원 시 내비 위치) → 가까운 화장실 5곳 추림 → 상위 3곳은 내비 `requestTrip`으로 실제 도착 예정 시간 조회 → 가장 빨리 닿는 곳 + 예비 1곳 선택 → 내비 경로에 추가 → 음성 안내
+"화장실 급해요" 버튼 → 현재 위치(FusedLocation, 미지원 시 내비 위치) → 가까운 화장실 5곳 + 가까운 휴게소·졸음쉼터 2곳 추림 → 내비 `requestTrip`으로 실제 도착 예정 시간 조회(내비가 답하지 않으면 거리로 추정) → 가장 빨리 닿는 곳 + 예비 1곳 선택 → 내비 경로에 추가 → 음성 안내
 
 경로에 넣는 방식:
 
@@ -117,13 +153,18 @@ Pleos Connect 2.1.0 에뮬레이터는 차량 설정 요청을 받기만 하고 
 ## 빌드
 
 ```bash
-./gradlew assembleDebug
+./gradlew testDebugUnitTest   # 단위 테스트 (순위 결정, 개방시간 해석, 음성 명령, 도착 판단 등)
+./gradlew assembleDebug       # app/build/outputs/apk/debug/app-debug.apk
+./gradlew assembleRelease     # app/build/outputs/apk/release/app-release.apk
 ```
 
-APK는 `app/build/outputs/apk/debug/app-debug.apk`에 생성됩니다.
+release 서명 키는 저장소에 넣지 않습니다. `local.properties`에 아래 값을 넣으면 서명된 release APK가 만들어지고, 값이 없으면 서명 없이 빌드됩니다.
 
-```bash
-./gradlew testDebugUnitTest   # 순위 결정·개방시간 해석 단위 테스트
+```properties
+release.storeFile=/path/to/key.jks
+release.storePassword=...
+release.keyAlias=...
+release.keyPassword=...
 ```
 
 ## Pleos Connect Emulator 설정
@@ -143,5 +184,5 @@ adb forward tcp:8088 tcp:8088
 
 ## 참고
 
-- 공모전 접수양식(`contest-application-consent.docx`)은 개인정보가 들어가므로 `.gitignore`로 제외했습니다.
+- 공모전 접수양식(`contest-application-consent.docx`)과 서명 키 설정(`local.properties`)은 `.gitignore`로 제외했습니다.
 - Pleos 개발 문서: https://document.pleos.ai/
