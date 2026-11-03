@@ -179,7 +179,7 @@
 ## 7. 참고자료
 
 - GitHub 저장소: https://github.com/wnwoghd22/pleos (소스 코드, README에 실행 방법·테스트 환경)
-- APK: 저장소 `apk/` 폴더의 release APK
+- APK: 저장소 `apk/JaehongJu_pzzk_release.apk` (release 빌드)
 - 시연 영상: (촬영 후 링크 추가)
 
 ## 8. 숏폼 링크

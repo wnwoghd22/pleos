@@ -7,7 +7,7 @@
 
 ## APK
 
-- 위치: [`apk/`](apk/) 폴더의 `*_뿌지직_release.apk` (서명된 release 빌드)
+- 위치: [`apk/JaehongJu_pzzk_release.apk`](apk/JaehongJu_pzzk_release.apk) (서명된 release 빌드)
 - 패키지 이름: `com.jamkkanstop.app` (개발 중 가제를 쓰던 때의 이름을 그대로 둠)
 
 ## 실행 방법
@@ -19,7 +19,7 @@
    ```
 3. APK를 설치하고 앱 목록에서 **뿌지직**을 엽니다.
    ```bash
-   adb install apk/<파일명>.apk
+   adb install apk/JaehongJu_pzzk_release.apk
    ```
 4. 처음 열 때 위치 권한(화면에는 "알 수 없는 작업"으로 표시됨)을 **허용**합니다.
 5. **화장실 급해요** 버튼을 누릅니다. 가장 빨리 닿는 화장실과 예비 후보가 나오고, 내비 경로에 들어간 뒤 음성으로 안내합니다.
